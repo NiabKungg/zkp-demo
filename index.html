@@ -1,0 +1,477 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ZKP Playground — Zero-Knowledge Proof</title>
+<style>
+  :root{
+    --bg:#0b1220; --panel:#141d31; --panel2:#1b2742; --line:#28355422;
+    --text:#e2e8f0; --muted:#94a3b8; --accent:#38bdf8; --gold:#f59e0b;
+    --ok:#34d399; --bad:#f87171;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:radial-gradient(1200px 600px at 70% -10%, #16233f 0%, var(--bg) 55%);
+    color:var(--text); font-family:'Noto Sans Thai','Sarabun',system-ui,-apple-system,sans-serif;
+    min-height:100vh;
+  }
+  header{padding:28px 20px 10px; text-align:center}
+  header h1{margin:0; font-size:1.7rem; letter-spacing:.5px}
+  header h1 .zk{color:var(--accent)}
+  header p{margin:8px 0 0; color:var(--muted); font-size:.95rem}
+  nav{display:flex; gap:10px; justify-content:center; margin:18px 0 6px; flex-wrap:wrap}
+  nav button{
+    background:var(--panel); color:var(--muted); border:1px solid #2b3a5e; padding:10px 22px;
+    border-radius:999px; cursor:pointer; font-size:1rem; font-family:inherit; transition:.15s;
+  }
+  nav button.active{background:var(--accent); color:#06263a; font-weight:700; border-color:var(--accent)}
+  main{max-width:980px; margin:0 auto; padding:10px 16px 40px}
+  .card{background:var(--panel); border:1px solid #223052; border-radius:16px; padding:18px 20px; margin-bottom:16px; box-shadow:0 8px 30px #0006}
+  .card h2{margin:0 0 6px; font-size:1.15rem}
+  .card .desc{color:var(--muted); font-size:.92rem; margin:0 0 12px; line-height:1.6}
+  button.act{
+    background:#0ea5e9; border:none; color:#04283c; font-weight:700; font-family:inherit;
+    padding:10px 18px; border-radius:10px; cursor:pointer; font-size:.98rem; margin:3px 6px 3px 0; transition:.15s;
+  }
+  button.act:hover{filter:brightness(1.1)}
+  button.act:disabled{opacity:.4; cursor:not-allowed}
+  button.act.ghost{background:transparent; color:var(--accent); border:1px solid var(--accent)}
+  label.tog{display:inline-flex; align-items:center; gap:8px; color:var(--muted); cursor:pointer; user-select:none; margin-right:14px}
+  .stage{background:#0e1628; border:1px solid #223052; border-radius:12px; overflow:hidden}
+  svg{display:block; width:100%; height:auto}
+  .stats{display:flex; gap:18px; flex-wrap:wrap; color:var(--muted); font-size:.92rem; margin-top:10px}
+  .stats b{color:var(--text)}
+  #caveLog{max-height:180px; overflow:auto; font-size:.9rem; line-height:1.7; margin-top:10px; border-top:1px dashed #2b3a5e; padding-top:8px}
+  #caveLog .line{font-family:ui-monospace,Consolas,monospace; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .ok{color:var(--ok)} .bad{color:var(--bad)} .warn{color:var(--gold)}
+  .prob{color:var(--muted); font-size:.88rem; margin-top:6px}
+  /* Schnorr */
+  .step{border:1px solid #26355a; background:var(--panel2); border-radius:12px; padding:12px 14px; margin-bottom:10px; display:none}
+  .step.show{display:block; animation:pop .25s ease}
+  @keyframes pop{from{opacity:0; transform:translateY(6px)}to{opacity:1}}
+  .step .st{font-weight:700; margin-bottom:4px}
+  .step .sd{color:var(--muted); font-size:.9rem; line-height:1.55}
+  code.num{
+    display:block; margin-top:6px; background:#0a1120; border:1px solid #1f2c4c; border-radius:8px;
+    padding:8px 10px; font-family:ui-monospace,Consolas,monospace; font-size:.9rem; color:#a5d8ff;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer;
+  }
+  code.formula{color:var(--gold); background:none; border:none; padding:0; font-size:.95rem}
+  #schnorrResult{display:none; margin-top:4px; padding:12px 14px; border-radius:10px; font-weight:700; font-size:1.02rem}
+  #schnorrResult.ok{display:block; background:#0c2f22; color:var(--ok); border:1px solid #14532d}
+  #schnorrResult.bad{display:block; background:#331414; color:var(--bad); border:1px solid #7f1d1d}
+  .counter{color:var(--muted); font-size:.9rem; margin-top:8px}
+  details.codeblock{margin-top:14px}
+  details.codeblock pre{
+    background:#0a1120; border:1px solid #1f2c4c; border-radius:10px; padding:12px; overflow:auto;
+    font-size:.8rem; line-height:1.5; color:#c9d7ee;
+  }
+  footer{text-align:center; color:#64748b; font-size:.82rem; padding:8px 16px 30px; line-height:1.7}
+  footer a{color:var(--accent); text-decoration:none}
+  #presentBtn{position:fixed; top:14px; right:14px; z-index:50; font-size:.85rem; padding:8px 14px}
+  body.present{zoom:1.3}
+  body.present header p{display:none}
+  .num.expanded{white-space:normal; word-break:break-all; overflow:visible; text-overflow:clip}
+  .hiddenVal{filter:blur(6px); user-select:none}
+  .peek{font-size:.75rem; color:var(--muted); cursor:pointer; border-bottom:1px dotted var(--muted)}
+</style>
+</head>
+<body>
+<button class="act ghost" id="presentBtn" title="ขยายจอให้เห็นชัดบนโปรเจกเตอร์">🎬 โหมดพรีเซนต์ (P)</button>
+
+<header>
+  <h1><span class="zk">Zero-Knowledge</span> Proof Playground</h1>
+  <p>ดีโม่ 2 แบบ — ① อินตูอิชัน: ถ้ำ Ali Baba&nbsp;&nbsp;② โปรโตคอลจริง: Schnorr identification (คริปโตจริง รันสดได้)</p>
+</header>
+
+<nav>
+  <button id="tabCave" class="active">① ถ้ำ Ali Baba</button>
+  <button id="tabSchnorr">② Schnorr Protocol (ตัวจริง)</button>
+</nav>
+
+<main>
+<!-- ============ TAB 1: CAVE ============ -->
+<section id="secCave">
+  <div class="card">
+    <h2>ถ้ำ Ali Baba — พิสูจน์ว่ารู้คาถา โดยไม่บอกคาถา</h2>
+    <p class="desc">
+      ผู้พิสูจน์เดินเข้าถ้ำทาง<b>ซ้ายหรือขวา</b>ตามใจชอบ แล้ว<b>ผู้ตรวจ</b> (ยืนอยู่หน้าปากถ้ำ) สุ่มตะโกนว่า
+      "ออกมาทางซ้าย/ขวา!" ใครรู้คาถาจะลอดประตูวิเศษข้างในแล้วออกทางที่ถูกเรียกได้<b>เสมอ</b>
+      ส่วนคนโกง (ไม่รู้คาถา) จะออกทางที่ถูกเรียกได้แค่ตอนที่ "เข้าถูกทาง" เอง — โอกาส 50% ต่อรอบ
+      ยิ่งเล่นหลายรอบ คนโกงยิ่งโดนจับ (โอกาสรอดครบ N รอบ = 1/2<sup>N</sup>)
+    </p>
+    <div>
+      <label class="tog"><input type="checkbox" id="cheatCave"> 🥸 โหมดคนโกง (ไม่รู้คาถา)</label>
+      <button class="act" id="btnCave1">▶ เดิน 1 รอบ</button>
+      <button class="act" id="btnCave10">⏩ เดิน 10 รอบ (เร็ว)</button>
+      <button class="act ghost" id="btnCaveReset">รีเซ็ต</button>
+    </div>
+    <div class="stage" style="margin-top:10px">
+      <svg viewBox="0 0 540 350" id="caveSvg">
+        <!-- ผนังถ้ำ -->
+        <path d="M40,350 L40,150 Q40,40 270,40 Q500,40 500,150 L500,350 Z" fill="#111a2e" stroke="#1f2c4c" stroke-width="2"/>
+        <!-- ทางเดิน -->
+        <path d="M270,64 C200,80 138,130 138,200 L138,248 C138,284 170,300 220,306 L240,306" fill="none" stroke="#334155" stroke-width="30" stroke-linecap="round"/>
+        <path d="M270,64 C340,80 402,130 402,200 L402,248 C402,284 370,300 320,306 L300,306" fill="none" stroke="#334155" stroke-width="30" stroke-linecap="round"/>
+        <!-- ประตูวิเศษ -->
+        <rect id="door" x="244" y="292" width="52" height="27" rx="5" fill="#f59e0b"/>
+        <text x="270" y="340" text-anchor="middle" font-size="13" fill="#f59e0b" font-family="inherit">✦ ประตูวิเศษ (ต้องมีคาถา) ✦</text>
+        <!-- ปากถ้ำ + ผู้ตรวจ -->
+        <circle cx="270" cy="22" r="9" fill="#a78bfa"/>
+        <rect x="263" y="31" width="14" height="16" rx="5" fill="#a78bfa"/>
+        <text x="292" y="18" font-size="13" fill="#c4b5fd" font-family="inherit">ผู้ตรวจ (Verifier)</text>
+        <text id="callText" x="270" y="95" text-anchor="middle" font-size="17" font-weight="bold" fill="#fbbf24" font-family="inherit" visibility="hidden"></text>
+        <!-- ผู้พิสูจน์ -->
+        <g id="prover" transform="translate(270,22)">
+          <circle id="proverRing" r="12" fill="none" stroke="#f87171" stroke-width="3" visibility="hidden"/>
+          <circle r="9" fill="#38bdf8" stroke="#0ea5e9" stroke-width="2"/>
+          <text x="0" y="-16" text-anchor="middle" font-size="12" fill="#7dd3fc" font-family="inherit">ผู้พิสูจน์</text>
+        </g>
+      </svg>
+    </div>
+    <div class="stats">
+      <span>รอบทั้งหมด: <b id="stRounds">0</b></span>
+      <span class="ok">ผ่าน: <b id="stPass">0</b></span>
+      <span class="bad">โดนจับ: <b id="stCaught">0</b></span>
+    </div>
+    <div class="prob" id="probLine">ถ้าเป็น "คนโกง" โอกาสหลอกผ่านครบทุกรอบที่เล่นมา = —</div>
+    <div id="caveLog"></div>
+  </div>
+</section>
+
+<!-- ============ TAB 2: SCHNORR ============ -->
+<section id="secSchnorr" hidden>
+  <div class="card">
+    <h2>Schnorr identification — ZKP แบบที่ใช้จริงในงานคริปโต</h2>
+    <p class="desc">
+      ผู้พิสูจน์มีความลับ <code class="formula">x</code> และเผยแพร่ค่าสาธารณะ <code class="formula">y = gˣ mod p</code>
+      จากนั้นพิสูจน์ให้ใครก็ได้เชื่อว่ารู้ <code class="formula">x</code> — <b>โดย x ไม่เคยถูกส่งออกไปเลย</b>
+      (ใครอยากหา x จาก y ต้องแก้ discrete logarithm ซึ่งคำนวณไม่ไหม้) ทุกตัวเลขด้านล่างคำนวณจริงด้วย JavaScript ในหน้านี้
+    </p>
+    <div>
+      <label class="tog"><input type="checkbox" id="cheatSchnorr"> 🥸 โหมดคนโกง (ไม่มี x — พยายามแอบอ้างเป็นเจ้าของ y)</label>
+      <button class="act" id="btnSNext">▶ ขั้นต่อไป</button>
+      <button class="act" id="btnSPlayAll">⏭ เล่นจบรอบนี้</button>
+      <button class="act ghost" id="btnSReset">สุ่มความลับใหม่</button>
+    </div>
+
+    <div style="margin-top:14px">
+      <div class="step" id="step1">
+        <div class="st">ขั้น 1 · เตรียมความลับ</div>
+        <div class="sd">สุ่มความลับ x (256 บิต) แล้วคำนวณ y = g<sup>x</sup> mod p — เผยแพร่ได้แค่ y เท่านั้น (g = 2, p = จำนวนเฉพาะ 256 บิต, q = p−1)</div>
+        <code class="num noexpand">x = <span id="vX" class="hiddenVal">—</span> <span class="peek" id="peekX">[แอบดู x — ในโปรโตคอลจริงทำไม่ได้!]</span></code>
+        <code class="num">y = gˣ mod p = <span id="vY">—</span></code>
+      </div>
+      <div class="step" id="step2">
+        <div class="st">ขั้น 2 · ผู้พิสูจน์ "คอมมิต"</div>
+        <div class="sd">สุ่ม r (nonce, ใช้ครั้งเดียวทิ้ง) แล้วส่ง t = g<sup>r</sup> mod p ให้ผู้ตรวจ — จุดสำคัญ: ต้องคอมมิตก่อนเห็นคำท้าทาย</div>
+        <code class="num">r = <span id="vR" class="hiddenVal">—</span></code>
+        <code class="num">t = gʳ mod p = <span id="vT">—</span></code>
+      </div>
+      <div class="step" id="step3">
+        <div class="st">ขั้น 3 · ผู้ตรวจสุ่ม "คำท้าทาย"</div>
+        <div class="sd">สุ่ม c (128 บิต) — ความสุ่มของผู้ตรวจนี่แหละที่บังคับให้ผู้พิสูจน์ต้องมี x จริง</div>
+        <code class="num">c = <span id="vC">—</span></code>
+      </div>
+      <div class="step" id="step4">
+        <div class="st">ขั้น 4 · ผู้พิสูจน์ "ตอบ"</div>
+        <div class="sd">คำนวณ s = (r + c·x) mod (p−1) — สังเกตว่าใน s มีทั้งความลับ x ปนอยู่ แต่กลับ "หัก r ออก" พอดี ทำให้เปิดเผยอะไรไม่ได้</div>
+        <code class="num">s = <span id="vS">—</span></code>
+      </div>
+      <div class="step" id="step5">
+        <div class="st">ขั้น 5 · ผู้ตรวจตรวจสอบ</div>
+        <div class="sd">ตรวจว่า <code class="formula">gˢ ≟ t · yᶜ (mod p)</code> — ถ้า s คำนวณจาก x จริง สมการจะออกมาเท่ากันเสมอ โดยไม่ต้องรู้ x เลย</div>
+        <code class="num">ฝั่งซ้าย gˢ mod p = <span id="vL">—</span></code>
+        <code class="num">ฝั่งขวา t·yᶜ mod p = <span id="vRhs">—</span></code>
+      </div>
+      <div id="schnorrResult"></div>
+      <div class="counter" id="schnorrCounter">ยืนยันสำเร็จ 0 รอบ · ล้มเหลว 0 รอบ</div>
+    </div>
+
+    <details class="codeblock">
+      <summary style="cursor:pointer;color:var(--muted)">ดูโค้ดหลักที่กำลังรันอยู่จริง ๆ (JavaScript BigInt)</summary>
+      <pre id="codeShow"></pre>
+    </details>
+  </div>
+</section>
+</main>
+
+<footer>
+  ไฟล์เดียว เปิดออฟไลน์ได้ 100% · จำนวนเฉพาะ 256 บิตตรวจสอบแล้วด้วย Miller–Rabin · เพื่อการสาธิตเชิงการสอน (ของจริงใช้ prime 2048+ บิต และ challenge จาก hash แบบ Fiat–Shamir)<br>
+  ⌨️ ลัดบนเวที: <b>Space/→</b> ขั้นต่อไป · <b>C</b> สลับคนโกง · <b>R</b> รีเซ็ต · <b>1/2</b> เปลี่ยนแท็บ · <b>P</b> โหมดพรีเซนต์ · คลิกตัวเลขเพื่อดูค่าเต็ม<br>
+  <a href="https://zkp.niabdev.xyz" target="_blank">zkp.niabdev.xyz</a> · <a href="https://github.com/NiabKungg/zkp-demo" target="_blank">ซอร์สโค้ดบน GitHub</a>
+</footer>
+
+<script>
+'use strict';
+/* ================= utilities ================= */
+const $ = id => document.getElementById(id);
+const randBig = bits => {
+  const a = new Uint8Array(bits/8); crypto.getRandomValues(a);
+  let v = 0n; for (const b of a) v = (v << 8n) | BigInt(b); return v;
+};
+function modpow(b, e, m){ let r = 1n; b %= m;
+  while (e > 0n){ if (e & 1n) r = r*b % m; b = b*b % m; e >>= 1n; } return r; }
+function hx(n){ return n.toString(16).toUpperCase(); }
+function short(n, max = 40){
+  const s = hx(n);
+  return s.length <= max ? '0x'+s : '0x'+s.slice(0, max) + '…(' + s.length + ' หลัก)';
+}
+function setNum(el, val){
+  el.dataset.full = hx(val); el.dataset.short = short(val);
+  el.classList.remove('expanded'); el.textContent = el.dataset.short; el.title = hx(val);
+}
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+/* ================= TAB switching ================= */
+$('tabCave').onclick = () => switchTab(true);
+$('tabSchnorr').onclick = () => switchTab(false);
+function switchTab(cave){
+  $('tabCave').classList.toggle('active', cave);
+  $('tabSchnorr').classList.toggle('active', !cave);
+  $('secCave').hidden = !cave;
+  $('secSchnorr').hidden = cave;
+}
+
+/* ================= PART 1: ALI BABA CAVE ================= */
+const P_WAY = {
+  split:  [270,64],
+  enterL: [[214,82],[152,140],[140,210],[140,250],[172,288],[238,306]],
+  enterR: [[326,82],[388,140],[400,210],[400,250],[368,288],[302,306]],
+  doorLR: [[252,306],[288,306]],
+  doorRL: [[288,306],[252,306]],
+  exitL:  [[238,306],[172,288],[140,250],[140,210],[152,140],[214,82],[270,64],[270,16]],
+  exitR:  [[302,306],[368,288],[400,250],[400,210],[388,140],[326,82],[270,64],[270,16]],
+};
+const prover = $('prover'), ring = $('proverRing'), doorEl = $('door'), callText = $('callText');
+let cur = {x:270, y:22}, segDur = 260, caveBusy = false;
+let caveStats = {rounds:0, pass:0, caught:0};
+
+function moveTo(pt, dur){
+  return new Promise(res => {
+    const from = {...cur}, t0 = performance.now();
+    (function frame(now){
+      let k = Math.min(1, (now - t0) / dur); k = k*k*(3-2*k);
+      cur.x = from.x + (pt[0]-from.x)*k; cur.y = from.y + (pt[1]-from.y)*k;
+      prover.setAttribute('transform', `translate(${cur.x},${cur.y})`);
+      k < 1 ? requestAnimationFrame(frame) : res();
+    })(t0);
+  });
+}
+async function walk(pts, dur){ for (const p of pts) await moveTo(p, dur); }
+
+function caveRoundLogic(cheat){
+  const enter  = Math.random() < .5 ? 'L' : 'R';
+  const called = Math.random() < .5 ? 'L' : 'R';
+  const usedDoor = enter !== called;
+  const caught = cheat && usedDoor;            // คนโกงข้ามประตูไม่ได้
+  return {enter, called, usedDoor, caught};
+}
+
+async function animateCaveRound(cheat, fast){
+  const d = fast ? 30 : segDur;
+  const R = caveRoundLogic(cheat);
+  await walk([P_WAY.split, ...(R.enter === 'L' ? P_WAY.enterL : P_WAY.enterR)], d);
+  callText.textContent = R.called === 'L' ? '🔊 ออกมาทางซ้าย!' : '🔊 ออกมาทางขวา!';
+  callText.setAttribute('visibility','visible');
+  await sleep(fast ? 60 : 650);
+  if (R.caught){
+    ring.setAttribute('visibility','visible');
+    await walk(R.enter === 'L' ? [...P_WAY.enterL].reverse() : [...P_WAY.enterR].reverse(), d);
+    await walk([[270,16]], d);
+    caveStats.caught++;
+  } else {
+    if (R.usedDoor){
+      doorEl.setAttribute('fill','#fde68a');
+      await walk(R.enter === 'L' ? P_WAY.doorLR : P_WAY.doorRL, fast ? 40 : 420);
+      doorEl.setAttribute('fill','#f59e0b');
+    }
+    await walk(R.called === 'L' ? P_WAY.exitL : P_WAY.exitR, d);
+    caveStats.pass++;
+  }
+  caveStats.rounds++;
+  ring.setAttribute('visibility','hidden');
+  callText.setAttribute('visibility','hidden');
+  addCaveLog(R, cheat);
+  renderCaveStats();
+}
+
+function addCaveLog(R, cheat){
+  const line = document.createElement('div'); line.className = 'line';
+  const side = s => s === 'L' ? 'ซ้าย' : 'ขวา';
+  let verdict;
+  if (R.caught)      verdict = '<span class="bad">จับได้! ✗ (ออกทางที่ถูกเรียกไม่ได้)</span>';
+  else if (cheat)    verdict = '<span class="ok">ผ่าน ✓ (บังเอิญเข้าถูกทาง)</span>';
+  else               verdict = '<span class="ok">ผ่าน ✓</span>' + (R.usedDoor ? ' <span class="warn">(ลอดประตู)</span>' : '');
+  line.innerHTML = `รอบที่ ${caveStats.rounds}: เข้า${side(R.enter)} → ถูกเรียก${side(R.called)} → ${verdict}`;
+  const log = $('caveLog'); log.prepend(line);
+  while (log.children.length > 200) log.lastChild.remove();
+}
+function renderCaveStats(){
+  $('stRounds').textContent = caveStats.rounds;
+  $('stPass').textContent   = caveStats.pass;
+  $('stCaught').textContent = caveStats.caught;
+  const n = caveStats.rounds;
+  $('probLine').innerHTML = n === 0
+    ? 'ถ้าเป็น "คนโกง" โอกาสหลอกผ่านครบทุกรอบที่เล่นมา = —'
+    : `เล่นมาแล้ว ${n} รอบ — ถ้าเป็น "คนโกง" โอกาสหลอกผ่านครบทุกรอบ = 1/2<sup>${n}</sup> ≈ 1 ใน ${(2n ** BigInt(n)).toLocaleString()}`;
+}
+async function guard(btn, fn){
+  if (caveBusy) return; caveBusy = true;
+  document.querySelectorAll('#secCave button').forEach(b => b.disabled = true);
+  try { await fn(); } finally {
+    caveBusy = false;
+    document.querySelectorAll('#secCave button').forEach(b => b.disabled = false);
+  }
+}
+$('btnCave1').onclick = () => guard('b', () => animateCaveRound($('cheatCave').checked, false));
+$('btnCave10').onclick = () => guard('b', async () => {
+  for (let i = 0; i < 10; i++) await animateCaveRound($('cheatCave').checked, true);
+});
+$('btnCaveReset').onclick = () => {
+  caveStats = {rounds:0, pass:0, caught:0};
+  $('caveLog').innerHTML = ''; renderCaveStats();
+  cur = {x:270, y:22}; prover.setAttribute('transform','translate(270,22)');
+};
+
+/* ================= PART 2: SCHNORR ================= */
+const P = 0xa6f51a8db70a2fa2193871539a83e12ba1b7fcb0d0eea607a5fbdc1f266c95bfn;
+const Q = P - 1n, G = 2n;
+const randBelow = n => { let v; do { v = randBig(256); } while (v >= n); return v; };
+
+let S = null, sPhase = 0, sBusy = false;
+let sStats = {ok:0, fail:0};
+const STEP_IDS = ['step1','step2','step3','step4','step5'];
+
+function newScenario(){
+  S = { x: randBelow(Q), r: null, c: null, s: null };
+  S.y = modpow(G, S.x, P);
+  sPhase = 0;
+  STEP_IDS.forEach(id => $(id).classList.remove('show'));
+  $('schnorrResult').className = ''; $('schnorrResult').style.display = 'none';
+  ['vX','vY','vR','vT','vC','vS','vL','vRhs'].forEach(id => $(id).textContent = '—');
+  $('vX').classList.add('hiddenVal');
+}
+function doStep(){
+  const cheat = $('cheatSchnorr').checked;
+  if (sPhase === 5) newScenarioKeepStats();   /* กดรอบถัดไป = เก็บจอรอบเก่า เริ่มรอบใหม่ */
+  switch (sPhase){
+    case 0:
+      setNum($('vX'), S.x); setNum($('vY'), S.y); break;
+    case 1:
+      S.r = randBelow(Q); S.t = modpow(G, S.r, P);
+      setNum($('vR'), S.r); setNum($('vT'), S.t); break;
+    case 2:
+      S.c = randBig(128); setNum($('vC'), S.c); break;
+    case 3:
+      S.s = cheat ? randBelow(Q)                       /* คนโกง: สุ่ม s มั่ว (หา x ไม่ได้) */
+                  : (S.r + S.c * S.x) % Q;
+      setNum($('vS'), S.s); break;
+    case 4: {
+      const lhs = modpow(G, S.s, P);
+      const rhs = S.t * modpow(S.y, S.c, P) % P;
+      setNum($('vL'), lhs); setNum($('vRhs'), rhs);
+      const ok = lhs === rhs;
+      const box = $('schnorrResult');
+      box.style.display = 'block';
+      if (ok){
+        sStats.ok++;
+        box.className = 'ok';
+        box.textContent = '✓ ยืนยันผ่าน — ผู้ตรวจเชื่อว่ารู้ x แต่ x ไม่เคยออกจากผู้พิสูจน์เลย';
+      } else {
+        sStats.fail++;
+        box.className = 'bad';
+        box.textContent = '✗ ยืนยันไม่ผ่าน — สุ่ม s มั่วไม่ได้ เพราะต้อง "ย้อน discrete log" จึงจะหลอกผ่าน';
+      }
+      $('schnorrCounter').textContent = `ยืนยันสำเร็จ ${sStats.ok} รอบ · ล้มเหลว ${sStats.fail} รอบ`;
+      break;
+    }
+  }
+  $(STEP_IDS[sPhase]).classList.add('show');
+  sPhase = sPhase + 1;                       /* 0…4 เดินขั้น, 5 = จบรอบ (ค้างผลไว้ให้ดู) */
+}
+function newScenarioKeepStats(){          /* เริ่มรอบใหม่ (คง x เดิม เหมือนของจริง) */
+  S.r = S.c = S.t = S.s = null;
+  STEP_IDS.forEach(id => $(id).classList.remove('show'));
+  $('schnorrResult').className = ''; $('schnorrResult').style.display = 'none';
+  sPhase = 0;
+}
+$('btnSNext').onclick = () => { if (!sBusy) doStep(); };
+$('btnSPlayAll').onclick = () => { if (!sBusy) for (let i = 0; i < 5; i++) doStep(); };
+$('btnSReset').onclick = () => newScenario();
+$('cheatSchnorr').onchange = () => newScenario();
+$('peekX').onclick = () => $('vX').classList.toggle('hiddenVal');
+
+$('codeShow').textContent =
+`// จาวาสคริปต์จริงที่หน้านี้รัน (BigInt)
+function modpow(b, e, m){ let r = 1n; b %= m;
+  while (e > 0n){ if (e & 1n) r = r*b % m; b = b*b % m; e >>= 1n; } return r; }
+
+const P = ${hx(P)}n;   // จำนวนเฉพาะ 256 บิต
+const Q = P - 1n, G = 2n;
+
+const x = randBelow(Q);            // ความลับ
+const y = modpow(G, x, P);         // สาธารณะ
+const r = randBelow(Q);            // nonce
+const t = modpow(G, r, P);         // commit
+const c = randBig(128);            // challenge (ผู้ตรวจสุ่ม)
+const s = (r + c*x) % Q;           // response
+
+// verify: g^s ≟ t·y^c (mod p)
+modpow(G, s, P) === t * modpow(y, c, P) % P;   // → true`;
+
+newScenario();
+
+/* ================= โหมดพรีเซนต์ + คีย์ลัดบนเวที ================= */
+$('presentBtn').onclick = () => {
+  const on = document.body.classList.toggle('present');
+  $('presentBtn').textContent = on ? '✅ โหมดพรีเซนต์: เปิด (P)' : '🎬 โหมดพรีเซนต์ (P)';
+};
+document.addEventListener('click', e => {
+  const b = e.target.closest('button'); if (b) b.blur();   /* กัน Space กดปุ่มซ้ำตอนโฟกัสค้าง */
+  const num = e.target.closest('.num');
+  if (num && !num.classList.contains('noexpand')){
+    const span = num.querySelector('[data-full]');          /* สลับเฉพาะค่า ไม่แตะ label นำหน้า */
+    if (span && span.dataset.full){
+      const on = span.classList.toggle('expanded');
+      num.classList.toggle('expanded', on);
+      span.textContent = on ? '0x' + span.dataset.full : span.dataset.short;
+    }
+  }
+});
+addEventListener('keydown', e => {
+  if (e.target.matches?.('input')) return;
+  const k = e.key.toLowerCase();
+  if (e.key === ' ' || e.key === 'ArrowRight'){
+    e.preventDefault();
+    $('secCave').hidden ? $('btnSNext').click() : $('btnCave1').click();
+  }
+  else if (k === 'c'){
+    const cb = $('secCave').hidden ? $('cheatSchnorr') : $('cheatCave');
+    cb.checked = !cb.checked;
+    if (cb === $('cheatSchnorr')) cb.dispatchEvent(new Event('change'));
+  }
+  else if (k === 'r') $('secCave').hidden ? $('btnSReset').click() : $('btnCaveReset').click();
+  else if (e.key === '1') switchTab(true);
+  else if (e.key === '2') switchTab(false);
+  else if (k === 'p') $('presentBtn').click();
+});
+
+/* ================= debug hooks (สำหรับทดสอบอัตโนมัติ) ================= */
+window.__zkp = {
+  P: hx(P), caveRoundLogic,
+  runSchnorrRound(cheat){
+    const x = randBelow(Q), y = modpow(G, x, P);
+    const r = randBelow(Q), t = modpow(G, r, P), c = randBig(128);
+    const s = cheat ? randBelow(Q) : (r + c*x) % Q;
+    return modpow(G, s, P) === t * modpow(y, c, P) % P;
+  },
+  caveStats: () => ({...caveStats}),
+  setSpeed: ms => { segDur = ms; },
+  playRound: (cheat, fast) => animateCaveRound(cheat, fast),
+  schnorrStep: () => doStep(),
+};
+</script>
+</body>
+</html>
